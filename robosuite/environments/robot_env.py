@@ -355,12 +355,19 @@ class RobotEnv(MujocoEnv):
 
         @sensor(modality=modality)
         def camera_rgb(obs_cache):
-            img = self.sim.render(
-                camera_name=cam_name,
-                width=cam_w,
-                height=cam_h,
-                depth=cam_d,
-            )
+            #TODO: get rid of this
+            if self._use_dm_backend:
+                img = self.renderer.render_offscreen(
+                    cam_w,
+                    cam_h,
+                )
+            else:
+                img = self.sim.render(
+                    camera_name=cam_name,
+                    width=cam_w,
+                    height=cam_h,
+                    depth=cam_d,
+                )
             if cam_d:
                 rgb, depth = img
                 obs_cache[depth_sensor_name] = np.expand_dims(depth[::convention], axis=-1)

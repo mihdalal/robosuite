@@ -1,5 +1,6 @@
 import abc
 from collections.abc import Iterable
+from d4rl.kitchen.adept_envs.simulation import module
 import numpy as np
 import mujoco_py
 import robosuite.utils.macros as macros
@@ -147,7 +148,12 @@ class Controller(object, metaclass=abc.ABCMeta):
             self.J_full = np.array(np.vstack([self.J_pos, self.J_ori]))
 
             mass_matrix = np.ndarray(shape=(len(self.sim.data.qvel) ** 2,), dtype=np.float64, order='C')
-            mujoco_py.cymj._mj_fullM(self.sim.model, mass_matrix, self.sim.data.qM)
+            #TODO: definitely clean this up and subclass
+            try:
+                mujoco_py.cymj._mj_fullM(self.sim.model, mass_matrix, self.sim.data.qM)
+            except:
+                mjlib= module.get_dm_mujoco().wrapper.mjbindings.mjlib
+                mjlib.mj_fullM(self.sim.model.ptr, mass_matrix, self.sim.data.qM)
             mass_matrix = np.reshape(mass_matrix, (len(self.sim.data.qvel), len(self.sim.data.qvel)))
             self.mass_matrix = mass_matrix[self.qvel_index, :][:, self.qvel_index]
 
