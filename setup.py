@@ -2,13 +2,13 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="robosuite",
+    name="robosuite_vices",
     packages=[
-        package for package in find_packages() if package.startswith("robosuite")
+        package for package in find_packages() if package.startswith("robosuite_vices")
     ],
     install_requires=[
         "numpy>=1.13.3",
-        "mujoco-py<1.50.2,>=1.50.1",
+        # "mujoco-py<1.50.2,>=1.50.1",
     ],
     eager_resources=['*'],
     include_package_data=True,

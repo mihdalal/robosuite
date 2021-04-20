@@ -1,3 +1,4 @@
+from d4rl.kitchen.adept_envs.simulation import module
 import numpy as np
 import scipy
 from enum import Enum
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 from mujoco_py import load_model_from_xml, MjSim, functions
 from scipy.interpolate import CubicSpline
+# from metaworld.envs.mujoco.sawyer_xyz.sawyer_dial_turn import SawyerDialTurnEnv
 
 
 class ControllerType(str, Enum):
@@ -63,7 +65,6 @@ class Controller():
         # Limits to the policy outputs
         self.input_max = max_action
         self.input_min = min_action
-
         # This handles when the mean of max and min control is not zero -> actions are around that mean
         self.action_scale = abs(self.control_max - self.control_min) / abs(max_action - min_action)
         self.action_output_transform = (self.control_max + self.control_min) / 2.0
@@ -91,38 +92,37 @@ class Controller():
         self.Jr = None
         self.J_full = None
 
-    def reset(self):
-        """
-        Resets the internal values of the controller
-        """
-        pass
-
     def transform_action(self, action):
         """
         Scale the action to go to the right min and max
         """
+
+
         action = np.clip(action, self.input_min, self.input_max)
         transformed_action = (action - self.action_input_transform) * self.action_scale + self.action_output_transform
 
         return transformed_action
 
-    def update_model(self, sim, joint_index, id_name='right_hand'):
+    def update_model(self, sim, joint_index_pos, joint_index_vel, id_name='hand'):
         """
         Updates the state of the robot used to compute the control command
         """
         self.model_timestep = sim.model.opt.timestep
         self.interpolation_steps = np.floor(self.ramp_ratio * self.control_freq / self.model_timestep)
-        self.current_position = sim.data.body_xpos[sim.model.body_name2id(id_name)]
-        self.current_orientation_mat = sim.data.body_xmat[sim.model.body_name2id(id_name)].reshape([3, 3])
-        self.current_lin_velocity = sim.data.body_xvelp[sim.model.body_name2id(id_name)]
-        self.current_ang_velocity = sim.data.body_xvelr[sim.model.body_name2id(id_name)]
+        if id_name:
+            self.current_position = sim.data.body_xpos[sim.model.body_name2id(id_name)]
+            self.current_orientation_mat = sim.data.body_xmat[sim.model.body_name2id(id_name)].reshape([3, 3])
+            self.current_lin_velocity = sim.data.body_xvelp[sim.model.body_name2id(id_name)]
+            self.current_ang_velocity = sim.data.body_xvelr[sim.model.body_name2id(id_name)]
 
-        self.current_joint_position = sim.data.qpos[joint_index]
-        self.current_joint_velocity = sim.data.qvel[joint_index]
+            self.Jx = sim.data.get_body_jacp(id_name).reshape((3, -1))[:, joint_index_vel]
+            self.Jr = sim.data.get_body_jacr(id_name).reshape((3, -1))[:, joint_index_vel]
+            self.J_full = np.vstack([self.Jx, self.Jr])
 
-        self.Jx = sim.data.get_body_jacp(id_name).reshape((3, -1))[:, joint_index]
-        self.Jr = sim.data.get_body_jacr(id_name).reshape((3, -1))[:, joint_index]
-        self.J_full = np.vstack([self.Jx, self.Jr])
+        self.current_joint_position = sim.data.qpos[joint_index_pos]
+        self.current_joint_velocity = sim.data.qvel[joint_index_vel]
+
+
 
     def update_mass_matrix(self, sim, joint_index):
         """
@@ -131,7 +131,11 @@ class Controller():
         joint_index - list of joint position indices in Mujoco
         """
         mass_matrix = np.ndarray(shape=(len(sim.data.qvel) ** 2,), dtype=np.float64, order='C')
-        mujoco_py.cymj._mj_fullM(sim.model, mass_matrix, sim.data.qM)
+        try:
+            mujoco_py.cymj._mj_fullM(sim.model, mass_matrix, sim.data.qM)
+        except:
+            mjlib= module.get_dm_mujoco().wrapper.mjbindings.mjlib
+            mjlib.mj_fullM(sim.model.ptr, mass_matrix, sim.data.qM)
         mass_matrix = np.reshape(mass_matrix, (len(sim.data.qvel), len(sim.data.qvel)))
         self.mass_matrix = mass_matrix[joint_index, :][:, joint_index]
 
@@ -145,7 +149,7 @@ class Controller():
             self.goal_kp = np.clip(self.impedance_kp[self.action_mask] + action[self.kp_index[0]:self.kp_index[1]],
                                    self.kp_min, self.kp_max)
             self.goal_damping = np.clip(
-                self.impedance_damping[self.action_mask] + action[self.damping_index[0]:self.damping_index[1]], self.damping_min,
+                self.damping[self.action_mask] + action[self.damping_index[0]:self.damping_index[1]], self.damping_min,
                 self.damping_max)
         else:
             # no clipped is needed here, since the action has already been scaled
@@ -171,7 +175,7 @@ class Controller():
         def update_impedance(index):
             if index < self.interpolation_steps - 1:
                 self.impedance_kp[self.action_mask] += delta_kp_per_step
-                self.impedance_damping[self.action_mask] += delta_damping_per_step
+                self.damping[self.action_mask] += delta_damping_per_step
 
         self.update_impedance = update_impedance
 
@@ -243,128 +247,6 @@ class Controller():
         raise NotImplementedError
 
 
-class JointTorqueController(Controller):
-    """
-    Class to interpret actions as joint torques
-    """
-
-    def __init__(self,
-                 control_range,
-                 max_action=1,
-                 min_action=-1,
-                 # impedance_flag= False,  ## TODO ## : Why is this commented out?
-                 inertia_decoupling=False,
-                 interpolation = None,
-                 **kwargs
-                 ):
-
-        super(JointTorqueController, self).__init__(
-            control_max=np.array(control_range),
-            control_min=-1 * np.array(control_range),
-            max_action=max_action,
-            min_action=min_action,
-            interpolation=interpolation,
-            **kwargs)
-
-        # self.use_delta_impedance = False
-        self.interpolate = True
-        self.last_goal = np.zeros(self.control_dim)
-        self.step = 0
-        self.inertia_decoupling = inertia_decoupling
-
-    def reset(self):
-        super().reset()
-        self.step = 0
-        self.last_goal = np.zeros(self.control_dim)
-
-    def action_to_torques(self, action, policy_step):
-        action = self.transform_action(action)
-
-        if policy_step:
-            self.step = 0
-            self.goal = np.array((action))
-            if self.interpolation and self.interpolation != "linear":
-                print("Only linear interpolation supported for this controller type.")
-            if self.interpolation == "linear":
-                self.linear_interpolate(self.last_goal, self.goal)
-            else:
-                self.last_goal = np.array((self.goal))
-
-        if self.interpolation == "linear":
-            self.last_goal = self.linear[self.step]
-
-            if self.step < self.interpolation_steps - 1:
-                self.step += 1
-
-        # decoupling with mass matrix
-        if self.inertia_decoupling:
-            torques = self.mass_matrix.dot(self.last_goal)
-        else:
-            torques = np.array(self.last_goal)
-
-        return torques
-
-    def update_model(self, sim, joint_index, id_name='right_hand'):
-
-        super().update_model(sim, joint_index, id_name)
-
-        if self.inertia_decoupling:
-            self.update_mass_matrix(sim, joint_index)
-
-
-class JointVelocityController(Controller):
-    """
-    Class to interprete actions as joint velocities
-    """
-
-    def __init__(self,
-                 control_range,
-                 kv,
-                 max_action=1,
-                 min_action=-1,
-                 interpolation=None,
-                 ):
-        super(JointVelocityController, self).__init__(
-            control_max=np.array(control_range),
-            control_min=-1 * np.array(control_range),
-            max_action=max_action,
-            min_action=min_action,
-            interpolation=interpolation)
-
-        self.kv = np.array(kv)
-        self.interpolate = True
-
-        self.last_goal = np.zeros(self.control_dim)
-        self.step = 0
-
-    def reset(self):
-        super().reset()
-        self.step = 0
-        self.last_goal = np.zeros(self.control_dim)
-
-    def action_to_torques(self, action, policy_step):
-        action = self.transform_action(action)
-        if policy_step:
-            self.step = 0
-            self.goal = np.array((action))
-            if self.interpolation and self.interpolation != "linear":
-                print("Only linear interpolation supported for this controller type.")
-            if self.interpolation == "linear":
-                self.linear_interpolate(self.last_goal, self.goal)
-            else:
-                self.last_goal = np.array((self.goal))
-
-        if self.interpolation == "linear":
-            self.last_goal = self.linear[self.step]
-
-            if self.step < self.interpolation_steps - 1:
-                self.step += 1
-
-        # Torques for each joint are kv*(q_dot_desired - q_dot)
-        torques = np.multiply(self.kv, (self.last_goal - self.current_joint_velocity))
-
-        return torques
-
 
 class JointImpedanceController(Controller):
     """
@@ -378,12 +260,15 @@ class JointImpedanceController(Controller):
                  kp_min,
                  damping_max,
                  damping_min,
-                 impedance_flag=False,
+                 impedance_flag=True,
                  max_action=1,
                  min_action=-1,
                  interpolation=None,
                  **kwargs
                  ):
+
+
+        # action  = (9 joint values = goal, 9 kp, 9 kv)
         # for back-compatibility interpret a single # as the same value for all joints
         if type(kp_max) != list: kp_max = [kp_max] * len(control_range)
         if type(kp_min) != list: kp_min = [kp_min] * len(control_range)
@@ -406,16 +291,9 @@ class JointImpedanceController(Controller):
 
         self.interpolate = True
         self.use_delta_impedance = False
-        self.impedance_kp = (np.array(kp_max) + np.array(kp_min)) * 0.5
-        self.impedance_damping = (np.array(damping_max) + np.array(damping_min)) * 0.5
+        self.impedance_kp = (np.array(kp_max) - np.array(kp_min)) * 0.5
+        self.damping = (np.array(damping_max) - np.array(damping_min)) * 0.5
         self.last_goal_joint = np.zeros(self.control_dim)
-        self.step = 0
-
-    def reset(self):
-        super().reset()
-        self.step = 0
-        self.last_goal_joint = np.zeros(self.control_dim)
-
 
     def interpolate_joint(self, starting_joint, last_goal_joint, goal_joint, current_vel):
         # We interpolate to reach the commanded desired position in self.ramp_ratio % of the time we have this goal
@@ -441,8 +319,7 @@ class JointImpedanceController(Controller):
             self.step = 0
             self.goal_joint_position = self.current_joint_position + action[0:self.control_dim]
 
-            if self.impedance_flag: self.set_goal_impedance(
-                action)  # this takes into account whether or not it's delta impedance
+            if self.impedance_flag: self.set_goal_impedance(action)  # this takes into account whether or not it's delta impedance
 
             if self.interpolation:
                 if np.linalg.norm(self.last_goal_joint) == 0:
@@ -452,11 +329,11 @@ class JointImpedanceController(Controller):
 
             if self.impedance_flag:
                 if self.interpolation:
-                    self.interpolate_impedance(self.impedance_kp, self.impedance_damping, self.goal_kp, self.goal_damping)
+                    self.interpolate_impedance(self.impedance_kp, self.damping, self.goal_kp, self.goal_damping)
                 else:
                     # update impedances immediately
                     self.impedance_kp[self.action_mask] = self.goal_kp
-                    self.impedance_damping[self.action_mask] = self.goal_damping
+                    self.damping[self.action_mask] = self.goal_damping
 
         # if interpolation is specified, then interpolate. Otherwise, pass
         if self.interpolation:
@@ -470,34 +347,93 @@ class JointImpedanceController(Controller):
 
             if self.step < self.interpolation_steps - 1:
                 self.step += 1
-            if self.impedance_flag: self.update_impedance(
-                self.step)
+            if self.impedance_flag:
+                self.update_impedance(self.step)
 
         else:
             self.last_goal_joint = np.array(self.goal_joint_position)
 
             if self.impedance_flag:
                 self.impedance_kp = action[self.kp_index[0]:self.kp_index[1]]
-                self.impedance_damping = action[self.damping_index[0]:self.damping_index[1]]
+                self.damping = action[self.damping_index[0]:self.damping_index[1]]
 
         position_joint_error = self.last_goal_joint - self.current_joint_position
 
-        self.impedance_kv = 2 * np.sqrt(self.impedance_kp) * self.impedance_damping
+        self.impedance_kv = 2 * np.sqrt(self.impedance_kp) * self.damping
 
         norm = np.linalg.norm(self.current_joint_velocity)
         if norm > 7.0:
             self.current_joint_velocity /= (norm * 7.0)
 
-        torques = np.multiply(self.impedance_kp, position_joint_error) - np.multiply(self.impedance_kv,
-                                                                                     self.current_joint_velocity)
-
+        torques = np.multiply(self.impedance_kp, position_joint_error) - np.multiply(self.impedance_kv, self.current_joint_velocity)
         decoupled_torques = np.dot(self.mass_matrix, torques)
 
         return decoupled_torques
 
-    def update_model(self, sim, joint_index, id_name='right_hand'):
-        super().update_model(sim, joint_index, id_name)
-        self.update_mass_matrix(sim, joint_index)
+
+
+    def action_to_pos_delta(self, action, policy_step):
+
+        action = self.transform_action(action)
+        if policy_step == True:
+            self.step = 0
+            self.goal_joint_position = self.current_joint_position + action[0:self.control_dim]
+
+            if self.impedance_flag: self.set_goal_impedance(action)  # this takes into account whether or not it's delta impedance
+
+            if self.interpolation:
+                if np.linalg.norm(self.last_goal_joint) == 0:
+                    self.last_goal_joint = self.current_joint_position
+                self.interpolate_joint(self.current_joint_position, self.last_goal_joint, self.goal_joint_position,
+                                       self.current_joint_velocity)
+
+            if self.impedance_flag:
+                if self.interpolation:
+                    self.interpolate_impedance(self.impedance_kp, self.damping, self.goal_kp, self.goal_damping)
+                else:
+                    # update impedances immediately
+                    self.impedance_kp[self.action_mask] = self.goal_kp
+                    self.damping[self.action_mask] = self.goal_damping
+
+        # if interpolation is specified, then interpolate. Otherwise, pass
+        if self.interpolation:
+            if self.interpolation == 'cubic':
+                self.last_goal_joint = self.spline_joint(self.step)
+            elif self.interpolation == 'linear':
+                self.last_goal_joint = self.linear_joint[self.step]
+            else:
+                logger.error("[Controller] Invalid interpolation! Please specify 'cubic' or 'linear'.")
+                exit(-1)
+
+            if self.step < self.interpolation_steps - 1:
+                self.step += 1
+            if self.impedance_flag:
+                self.update_impedance(self.step)
+
+        else:
+            self.last_goal_joint = np.array(self.goal_joint_position)
+
+            if self.impedance_flag:
+                self.impedance_kp = action[self.kp_index[0]:self.kp_index[1]]
+                self.damping = action[self.damping_index[0]:self.damping_index[1]]
+
+        position_joint_error = self.last_goal_joint - self.current_joint_position
+
+        self.impedance_kv = 2 * np.sqrt(self.impedance_kp) * self.damping
+
+        norm = np.linalg.norm(self.current_joint_velocity)
+        if norm > 7.0:
+            self.current_joint_velocity /= (norm * 7.0)
+
+        torques = np.multiply(self.impedance_kp, position_joint_error) - np.multiply(self.impedance_kv, self.current_joint_velocity)
+
+        decoupled_torques = torques
+
+        return decoupled_torques
+
+    def update_model(self, sim, joint_index_pos, joint_index_vel, id_name='right_hand'):
+        super().update_model(sim, joint_index_pos, joint_index_vel, id_name=None)
+        self.update_mass_matrix(sim, joint_index_vel)
 
     @property
     def action_mask(self):
@@ -526,7 +462,7 @@ class PositionOrientationController(Controller):
                  control_freq=20,
                  max_action=1,
                  min_action=-1,
-                 impedance_flag=False,
+                 impedance_flag=True,
                  position_limits=[[0, 0, 0], [0, 0, 0]],
                  orientation_limits=[[0, 0, 0], [0, 0, 0]],
                  interpolation=None,
@@ -565,7 +501,6 @@ class PositionOrientationController(Controller):
             kp_param_min = kp_min
             damping_param_max = damping_max
             damping_param_min = damping_min
-
         super(PositionOrientationController, self).__init__(
             control_max=control_max,
             control_min=control_min,
@@ -585,17 +520,11 @@ class PositionOrientationController(Controller):
         )
 
         self.impedance_kp = np.array(initial_impedance).astype('float64')
-        self.impedance_damping = np.array(initial_damping).astype('float64')
+        self.damping = np.array(initial_damping).astype('float64')
 
         self.step = 0
         self.interpolate = True
 
-        self.last_goal_position = np.array((0, 0, 0))
-        self.last_goal_orientation = np.eye(3)
-
-    def reset(self):
-        super().reset()
-        self.step = 0
         self.last_goal_position = np.array((0, 0, 0))
         self.last_goal_orientation = np.eye(3)
 
@@ -642,7 +571,6 @@ class PositionOrientationController(Controller):
         Assumes the robot's model is updated.
         """
         action = self.transform_action(action)
-
         # This is computed only when we receive a new desired goal from policy
         if policy_step == True:
             self.step = 0
@@ -667,11 +595,11 @@ class PositionOrientationController(Controller):
             if self.impedance_flag:
                 if self.interpolation:
                     # set goals for next round of interpolation
-                    self.interpolate_impedance(self.impedance_kp, self.impedance_damping, self.goal_kp, self.goal_damping)
+                    self.interpolate_impedance(self.impedance_kp, self.damping, self.goal_kp, self.goal_damping)
                 else:
                     # update impedances immediately
                     self.impedance_kp[self.action_mask] = self.goal_kp
-                    self.impedance_damping[self.action_mask] = self.goal_damping
+                    self.damping[self.action_mask] = self.goal_damping
 
         if self.interpolation:
             if self.interpolation == 'cubic':
@@ -698,7 +626,7 @@ class PositionOrientationController(Controller):
 
             if self.impedance_flag:
                 self.impedance_kp = action[self.kp_index[0]:self.kp_index[1]]
-                self.impedance_damping = action[self.damping_index[0]:self.damping_index[1]]
+                self.damping = action[self.damping_index[0]:self.damping_index[1]]
 
         position_error = self.last_goal_position - self.current_position
         #print("Position err: {}".format(position_error))
@@ -706,7 +634,7 @@ class PositionOrientationController(Controller):
                                                              current=self.current_orientation_mat)
 
         # always ensure critical damping TODO - technically this is called unneccessarily if the impedance_flag is not set
-        self.impedance_kv = 2 * np.sqrt(self.impedance_kp) * self.impedance_damping
+        self.impedance_kv = 2 * np.sqrt(self.impedance_kp) * self.damping
 
         return self.calculate_impedance_torques(position_error, orientation_error)
 
@@ -717,8 +645,9 @@ class PositionOrientationController(Controller):
         desired_force = (np.multiply(np.array(position_error), np.array(self.impedance_kp[0:3]))
                          - np.multiply(np.array(self.current_lin_velocity), self.impedance_kv[0:3]))
 
-        desired_torque = (np.multiply(np.array(orientation_error), np.array(self.impedance_kp[3:6]))
-                          - np.multiply(np.array(self.current_ang_velocity), self.impedance_kv[3:6]))
+        # desired_torque = (np.multiply(np.array(orientation_error), np.array(self.impedance_kp[3:6]))
+        #                   - np.multiply(np.array(self.current_ang_velocity), self.impedance_kv[3:6]))
+        desired_torque = np.zeros_like(desired_force)
 
         uncoupling = True
         if (uncoupling):
@@ -743,19 +672,29 @@ class PositionOrientationController(Controller):
 
         return torques
 
-    def update_model(self, sim, joint_index, id_name='right_hand'):
+    # def update_model(self, sim, joint_index, id_name='hand'):
+    #
+    #     super().update_model(sim, joint_index, joint_index, id_name)
+    #
+    #     self.update_mass_matrix(sim, joint_index)
+    #     # if np.linalg.det(self.mass_matrix) < 1e-8:
+    #     #     print('singular')
+    #     #     self.mass_matrix += np.eye(self.mass_matrix.shape[0])
+    #     #     np.linalg.det(self.mass_matrix)
+    #     self.update_model_opspace(joint_index)
 
-        super().update_model(sim, joint_index, id_name)
 
-        self.update_mass_matrix(sim, joint_index)
-        self.update_model_opspace(joint_index)
+
+    def update_model(self, sim, joint_index_pos, joint_index_vel, id_name='right_hand'):
+        super().update_model(sim, joint_index_pos, joint_index_vel, id_name=id_name)
+        self.update_mass_matrix(sim, joint_index_vel)
+        self.update_model_opspace(joint_index_vel)
 
     def update_model_opspace(self, joint_index):
         """
         Updates the following:
         -Lambda matrix (full, linear, and rotational)
         -Nullspace matrix
-
         joint_index - list of joint position indices in Mujoco
         """
         mass_matrix_inv = scipy.linalg.inv(self.mass_matrix)
@@ -899,7 +838,7 @@ class PositionController(PositionOrientationController):
                  initial_damping,
                  max_action=1.0,
                  min_action=-1.0,
-                 impedance_flag=False,
+                 impedance_flag=True,
                  initial_joint=None,
                  control_freq=20,
                  interpolation=None,
@@ -928,9 +867,6 @@ class PositionController(PositionOrientationController):
 
         self.goal_orientation_set = False
 
-    def reset(self):
-        super().reset()
-
     def set_goal_orientation(self, action, orientation=None):
         if orientation is not None:
             self._goal_orientation = orientation
@@ -949,3 +885,45 @@ class PositionController(PositionOrientationController):
     @property
     def goal_position(self):
         return self._goal_position
+
+
+
+if __name__ == '__main__':
+    # env = SawyerDialTurnEnv()
+
+
+
+    control_range_pos = np.ones(3)
+    kp_max = 100
+    kp_max_abs_delta = 50
+    kp_min = 1
+    damping_max = 2
+    damping_max_abs_delta = 1
+    damping_min = 0.1
+    use_delta_impedance = False
+    initial_impedance_pos = 10
+    initial_impedance_ori = 10
+    initial_damping = 0.25
+
+
+    controller = PositionController(
+                     control_range_pos,
+                     kp_max,
+                     kp_max_abs_delta,
+                     kp_min,
+                     damping_max,
+                     damping_max_abs_delta,
+                     damping_min,
+                     use_delta_impedance,
+                     initial_impedance_pos,
+                     initial_impedance_ori,
+                     initial_damping)
+
+    controller.update_model(env.sim, np.arange(7))
+    # controller.update_mass_matrix(env.sim, joint_index_vel)
+    import ipdb; ipdb.set_trace()
+    action = np.random.uniform(-1, 1, 9)
+    controller.action_to_torques(action, True)
+
+
+    act = 1
