@@ -360,6 +360,7 @@ class RobotEnv(MujocoEnv):
                 img = self.renderer.render_offscreen(
                     cam_w,
                     cam_h,
+                    camera_id=self.sim.model.camera_name2id(cam_name),
                 )
             else:
                 img = self.sim.render(
