@@ -706,7 +706,10 @@ class PositionOrientationController(Controller):
         )
 
         # (J M^-1 J^T)^-1
-        self.lambda_matrix = scipy.linalg.inv(lambda_matrix_inv)
+        try:
+            self.lambda_matrix = scipy.linalg.inv(lambda_matrix_inv)
+        except:
+            self.lambda_matrix = scipy.linalg.pinv(lambda_matrix_inv)
 
         # Jx M^-1 Jx^T
         lambda_x_matrix_inv = np.dot(
