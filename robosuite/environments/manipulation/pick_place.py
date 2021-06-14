@@ -379,13 +379,13 @@ class PickPlace(SingleArmEnv):
         bin_x_high = bin_x_low + self.bin_size[0] / 2
         bin_y_high = bin_y_low + self.bin_size[1] / 2
 
-        res = False
+        res = True
         if (
             bin_x_low < obj_pos[0] < bin_x_high
             and bin_y_low < obj_pos[1] < bin_y_high
             and self.bin2_pos[2] < obj_pos[2] < self.bin2_pos[2] + 0.1
         ):
-            res = True
+            res = False
         return res
 
     def _get_placement_initializer(self):
@@ -428,8 +428,8 @@ class PickPlace(SingleArmEnv):
             bin_x_high = bin_x_low + self.bin_size[0] / 2
             bin_y_high = bin_y_low + self.bin_size[1] / 2
             bin_center = np.array([
-                (bin_x_low + bin_x_high) / 2.,
-                (bin_y_low + bin_y_high) / 2.,
+                (bin_x_low + bin_x_high) / 2., 
+                (bin_y_low + bin_y_high) / 2., 
             ])
 
             # placement is relative to object bin, so compute difference and send to placement initializer
@@ -494,7 +494,7 @@ class PickPlace(SingleArmEnv):
         # task includes arena, robot, and objects of interest
         self.model = ManipulationTask(
             mujoco_arena=mujoco_arena,
-            mujoco_robots=[robot.robot_model for robot in self.robots],
+            mujoco_robots=[robot.robot_model for robot in self.robots], 
             mujoco_objects=self.visual_objects + self.objects,
         )
 
