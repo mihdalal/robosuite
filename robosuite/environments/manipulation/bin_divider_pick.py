@@ -152,7 +152,16 @@ class BinDividerPick(SingleArmEnv):
         camera_heights=256,
         camera_widths=256,
         camera_depths=False,
+        use_cube_movement_reward=False,
+        use_cube_shift_left_reward=False,
+        use_reaching_reward=False,
+        use_grasping_reward=False,
     ):
+        self.use_cube_movement_reward = use_cube_movement_reward
+        self.use_cube_shift_left_reward = use_cube_shift_left_reward
+        self.use_reaching_reward = use_reaching_reward
+        self.use_grasping_reward = use_grasping_reward
+
         # settings for table top
         self.table_full_size = table_full_size
         self.table_friction = table_friction
@@ -234,10 +243,19 @@ class BinDividerPick(SingleArmEnv):
             gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
             dist = np.linalg.norm(gripper_site_pos - cube_pos)
             reaching_reward = 1 - np.tanh(10.0 * dist)
-            reward += reaching_reward
+            if self.use_reaching_reward:
+                reward += reaching_reward
 
+            if self.use_cube_movement_reward:
+                if cube_pos[1] > 0:
+                    reward += 0.25*(cube_pos[1] != self.prev_cube_pos[1])
+                    self.prev_cube_pos = cube_pos
+
+            if self.use_cube_shift_left_reward:
+                if cube_pos[1] > 0:
+                    reward += - cube_pos[1]
             # grasping reward
-            if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
+            if self.use_grasping_reward and self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
                 reward += 0.25
 
         # Scale reward if requested
@@ -388,6 +406,7 @@ class BinDividerPick(SingleArmEnv):
             # Loop through all objects and reset their positions
             for obj_pos, obj_quat, obj in object_placements.values():
                 self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([np.array(obj_pos), np.array(obj_quat)]))
+            self.prev_cube_pos = self.sim.data.body_xpos[self.cube_body_id]
 
     def visualize(self, vis_settings):
         """
