@@ -320,10 +320,8 @@ class BinDividerPick(SingleArmEnv):
             self.placement_initializer = UniformRandomSampler(
                 name="ObjectSampler",
                 mujoco_objects=self.cube,
-                # x_range=[-0.165, .165],
-                # y_range=[0.035, 0.165],
-                x_range=[0.165, .165],
-                y_range=[0.165, 0.165],
+                x_range=[-0.165, .165],
+                y_range=[0.035, 0.165],
                 rotation=0,
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=True,
@@ -438,3 +436,16 @@ class BinDividerPick(SingleArmEnv):
         # return cube_height > table_height + 0.04
         cube_ypos = self.sim.data.body_xpos[self.cube_body_id][1]
         return cube_ypos < -0.04
+
+    def update_info(self, info):
+        # reaching reward
+        cube_pos = self.sim.data.body_xpos[self.cube_body_id]
+        gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
+        dist = np.linalg.norm(gripper_site_pos - cube_pos)
+        reaching_reward = 1 - np.tanh(10.0 * dist)
+        info['gripper_to_cube_dist'] = dist
+        info['cube_ypos'] = cube_pos[1]
+        info['has_grasped'] = self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube)
+        info['reaching_reward'] = reaching_reward
+        info['cube_shift_left_reward'] = (1 - np.tanh(10.0 * cube_pos[1]))
+
