@@ -152,12 +152,10 @@ class BinDividerPick(SingleArmEnv):
         camera_heights=256,
         camera_widths=256,
         camera_depths=False,
-        use_cube_movement_reward=False,
         use_cube_shift_left_reward=False,
         use_reaching_reward=False,
         use_grasping_reward=False,
     ):
-        self.use_cube_movement_reward = use_cube_movement_reward
         self.use_cube_shift_left_reward = use_cube_shift_left_reward
         self.use_reaching_reward = use_reaching_reward
         self.use_grasping_reward = use_grasping_reward
@@ -244,19 +242,14 @@ class BinDividerPick(SingleArmEnv):
             dist = np.linalg.norm(gripper_site_pos - cube_pos)
             reaching_reward = 1 - np.tanh(10.0 * dist)
             if self.use_reaching_reward:
-                reward += reaching_reward
-
-            if self.use_cube_movement_reward:
-                if cube_pos[1] > 0:
-                    reward += 0.25*(cube_pos[1] != self.prev_cube_pos[1])
-                    self.prev_cube_pos = cube_pos
+                reward += reaching_reward*0.5
 
             if self.use_cube_shift_left_reward:
-                if cube_pos[1] > 0:
-                    reward += - cube_pos[1]
+                if cube_pos[1] > -.04:
+                    reward += (1 - np.tanh(10.0 * cube_pos[1]))*.5
             # grasping reward
             if self.use_grasping_reward and self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
-                reward += 0.25
+                reward += 0.5
 
         # Scale reward if requested
         if self.reward_scale is not None:
@@ -327,8 +320,10 @@ class BinDividerPick(SingleArmEnv):
             self.placement_initializer = UniformRandomSampler(
                 name="ObjectSampler",
                 mujoco_objects=self.cube,
-                x_range=[-0.165, .165],
-                y_range=[0.035, 0.165],
+                # x_range=[-0.165, .165],
+                # y_range=[0.035, 0.165],
+                x_range=[0.165, .165],
+                y_range=[0.165, 0.165],
                 rotation=0,
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=True,
@@ -442,4 +437,4 @@ class BinDividerPick(SingleArmEnv):
         # # cube is higher than the table top above a margin
         # return cube_height > table_height + 0.04
         cube_ypos = self.sim.data.body_xpos[self.cube_body_id][1]
-        return cube_ypos < 0
+        return cube_ypos < -0.04

@@ -40,10 +40,10 @@
         <geom pos="0.0 0 0.125" size="0.2 0.01 0.01" type="box" conaffinity="0" contype="0" group="1" rgba="1 1 1 1"/>
 
         <!-- Legs (visual only) -->
-        <geom pos="0.15 0.2 -0.4" size="0.01 0.55" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg1_visual" material="table_legs_metal"/>
-        <geom pos="-0.15 0.2 -0.4" size="0.01 0.55" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg2_visual" material="table_legs_metal"/>
-        <geom pos="-0.15 -0.2 -0.4" size="0.01 0.55" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg3_visual" material="table_legs_metal"/>
-        <geom pos="0.15 -0.2 -0.4" size="0.01 0.55" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg4_visual" material="table_legs_metal"/>
+        <geom pos="0.15 0.2 -0.4" size="0.01 0.5" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg1_visual" material="table_legs_metal"/>
+        <geom pos="-0.15 0.2 -0.4" size="0.01 0.5" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg2_visual" material="table_legs_metal"/>
+        <geom pos="-0.15 -0.2 -0.4" size="0.01 0.5" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg3_visual" material="table_legs_metal"/>
+        <geom pos="0.15 -0.2 -0.4" size="0.01 0.5" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg4_visual" material="table_legs_metal"/>
     </body>
 
     <light diffuse=".8 .8 .8" dir="0 -.15 -1" directional="false" pos="1 1 4.0" specular="0.3 0.3 0.3" castshadow="false"/>
