@@ -256,6 +256,11 @@ class BinDividerPick(SingleArmEnv):
         xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
         self.robots[0].robot_model.set_base_xpos(xpos)
 
+        self.robots[0].init_qpos = np.array([ 0.09304119 , 0.60156891 , 0.08244785, -2.03597116 ,-0.09016702 , 2.6335321,
+  1.02460277]
+
+)
+
         # load model for table top workspace
         # mujoco_arena = TableArena(
         #     table_full_size=self.table_full_size,
@@ -290,8 +295,8 @@ class BinDividerPick(SingleArmEnv):
         )
         self.cube = BoxObject(
             name="cube",
-            size_min=[0.020, 0.020, 0.020],  # [0.015, 0.015, 0.015],
-            size_max=[0.022, 0.022, 0.022],  # [0.018, 0.018, 0.018])
+            size_min=[0.025, 0.025, 0.025],  # [0.015, 0.015, 0.015],
+            size_max=[0.025, 0.025, 0.025],  # [0.018, 0.018, 0.018])
             rgba=[168/255, 127/255, 214/255, 1],
             # material=redwood,
         )
@@ -304,13 +309,13 @@ class BinDividerPick(SingleArmEnv):
             self.placement_initializer = UniformRandomSampler(
                 name="ObjectSampler",
                 mujoco_objects=self.cube,
-                x_range=[-0.15, 0.15],
-                y_range=[0.03, 0.2],
-                rotation=None,
+                x_range=[-0.165, .165],
+                y_range=[0.035, 0.165],
+                rotation=0,
                 ensure_object_boundary_in_range=False,
                 ensure_valid_placement=True,
                 reference_pos=self.table_offset,
-                z_offset=0.01,
+                z_offset=0.12,
             )
 
         # task includes arena, robot, and objects of interest
