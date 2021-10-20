@@ -36,8 +36,8 @@
         <geom pos="0.2 0 0.12" size="0.01 0.25 0.0225" type="box" conaffinity="0" contype="0" group="1" material="light-wood"/>
         <geom pos="-0.2 0 0.12" size="0.01 0.25 0.0225" type="box" group="0" friction="1 0.005 0.0001" rgba="0 0 1 1"/>
         <geom pos="-0.2 0 0.12" size="0.01 0.25 0.0225" type="box" conaffinity="0" contype="0" group="1" material="light-wood"/>
-        <geom pos="0.0 0 0.125" size="0.2 0.01 0.01" type="box" group="0" friction="1 0.005 0.0001" rgba="0 0 1 1"/>
-        <geom pos="0.0 0 0.125" size="0.2 0.01 0.01" type="box" conaffinity="0" contype="0" group="1" rgba="1 1 1 1"/>
+        <geom pos="0.0 0 0.12" size="0.2 0.01 0.0225" type="box" group="0" friction="1 0.005 0.0001" rgba="0 0 1 1"/>
+        <geom pos="0.0 0 0.12" size="0.2 0.01 0.0225" type="box" conaffinity="0" contype="0" group="1" rgba="1 1 1 1"/>
 
         <!-- Legs (visual only) -->
         <geom pos="0.15 0.2 -0.4" size="0.01 0.5" type="cylinder" conaffinity="0" contype="0" group="1" name="bin1_leg1_visual" material="table_legs_metal"/>
