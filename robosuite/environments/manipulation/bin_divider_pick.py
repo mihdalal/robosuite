@@ -138,6 +138,7 @@ class BinDividerPick(SingleArmEnv):
         reward_scale=1.0,
         reward_shaping=False,
         placement_initializer=None,
+        placement_initializer_kwargs=None,
         has_renderer=False,
         has_offscreen_renderer=True,
         render_camera="frontview",
@@ -177,6 +178,7 @@ class BinDividerPick(SingleArmEnv):
 
         # object placement initializer
         self.placement_initializer = placement_initializer
+        self.placement_initializer_kwargs = placement_initializer_kwargs
 
         super().__init__(
             robots=robots,
@@ -314,6 +316,10 @@ class BinDividerPick(SingleArmEnv):
 
         # Create placement initializer
         if self.placement_initializer is not None:
+            self.placement_initializer.reset()
+            self.placement_initializer.add_objects(self.cube)
+        elif self.placement_initializer_kwargs is not None:
+            self.placement_initializer = UniformRandomSampler(**self.placement_initializer_kwargs)
             self.placement_initializer.reset()
             self.placement_initializer.add_objects(self.cube)
         else:
