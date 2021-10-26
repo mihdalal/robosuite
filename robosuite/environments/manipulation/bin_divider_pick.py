@@ -269,10 +269,7 @@ class BinDividerPick(SingleArmEnv):
         xpos = self.robots[0].robot_model.base_xpos_offset["table"](self.table_full_size[0])
         self.robots[0].robot_model.set_base_xpos(xpos)
 
-        self.robots[0].init_qpos = np.array([ 0.09304119 , 0.60156891 , 0.08244785, -2.03597116 ,-0.09016702 , 2.6335321,
-  1.02460277]
-
-)
+        self.robots[0].init_qpos = np.array([ 0.107,  0.426 , 0.076 ,-2.055 ,-0.1  ,  2.501, 0.999])
 
         # load model for table top workspace
         # mujoco_arena = TableArena(
