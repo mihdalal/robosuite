@@ -2,7 +2,7 @@ import numpy as np
 
 from robosuite.environments.manipulation.manipulation_env import ManipulationEnv
 from robosuite.robots import SingleArm
-from robosuite.utils.transform_utils import mat2quat
+from robosuite.utils.transform_utils import convert_quat
 
 
 class SingleArmEnv(ManipulationEnv):
@@ -66,4 +66,4 @@ class SingleArmEnv(ManipulationEnv):
         Returns:
             np.array: (x,y,z,w) End Effector quaternion
         """
-        return mat2quat(self._eef_xmat)
+        return convert_quat(self.sim.data.get_body_xquat(self.robots[0].robot_model.eef_name), to="xyzw")

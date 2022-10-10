@@ -452,13 +452,13 @@ class InverseKinematicsController(JointVelocityController):
                 endEffectorLinkIndex=self.bullet_ee_idx,
                 targetPosition=target_position,
                 targetOrientation=target_orientation,
-                lowerLimits=list(self.sim.model.jnt_range[self.joint_index, 0]),
-                upperLimits=list(self.sim.model.jnt_range[self.joint_index, 1]),
-                jointRanges=list(self.sim.model.jnt_range[self.joint_index, 1] -
-                                 self.sim.model.jnt_range[self.joint_index, 0]),
-                restPoses=self.rest_poses,
+                # lowerLimits=list(self.sim.model.jnt_range[self.joint_index, 0]),
+                # upperLimits=list(self.sim.model.jnt_range[self.joint_index, 1]),
+                # jointRanges=list(self.sim.model.jnt_range[self.joint_index, 1] -
+                #                  self.sim.model.jnt_range[self.joint_index, 0]),
+                # restPoses=self.rest_poses,
                 jointDamping=[0.1] * self.num_bullet_joints,
-                physicsClientId=self.bullet_server_id
+                physicsClientId=self.bullet_server_id,
             )
         )
         return list(np.array(ik_solution)[self.ik_command_indexes])

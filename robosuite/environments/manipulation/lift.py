@@ -150,6 +150,8 @@ class Lift(SingleArmEnv):
         camera_heights=256,
         camera_widths=256,
         camera_depths=False,
+        use_distance_reduced_to_object_reward=False,
+        use_min_prev_distance=False,
     ):
         # settings for table top
         self.table_full_size = table_full_size
@@ -165,6 +167,8 @@ class Lift(SingleArmEnv):
 
         # object placement initializer
         self.placement_initializer = placement_initializer
+
+        self.use_distance_reduced_to_object_reward = use_distance_reduced_to_object_reward
 
         super().__init__(
             robots=robots,
@@ -228,12 +232,19 @@ class Lift(SingleArmEnv):
             cube_pos = self.sim.data.body_xpos[self.cube_body_id]
             gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
             dist = np.linalg.norm(gripper_site_pos - cube_pos)
-            reaching_reward = 1 - np.tanh(10.0 * dist)
-            reward += reaching_reward
+            if self.use_distance_reduced_to_object_reward:
+                reward += self.prev_d - dist
+                if self.use_min_prev_distance:
+                    self.prev_d = min(self.prev_d, dist)
+                else:
+                    self.prev_d = dist
+            else:
+                reaching_reward = 1 - np.tanh(10.0 * dist)
+                reward += reaching_reward
 
             # grasping reward
             if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
-                reward += 0.25
+                reward += 0.5
 
         # Scale reward if requested
         if self.reward_scale is not None:
@@ -305,7 +316,7 @@ class Lift(SingleArmEnv):
         # task includes arena, robot, and objects of interest
         self.model = ManipulationTask(
             mujoco_arena=mujoco_arena,
-            mujoco_robots=[robot.robot_model for robot in self.robots], 
+            mujoco_robots=[robot.robot_model for robot in self.robots],
             mujoco_objects=self.cube,
         )
 
@@ -367,6 +378,9 @@ class Lift(SingleArmEnv):
         Resets simulation internal configurations.
         """
         super()._reset_internal()
+        cube_pos = self.sim.data.body_xpos[self.cube_body_id]
+        gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
+        self.prev_d = np.linalg.norm(gripper_site_pos - cube_pos)
 
         # Reset all object positions using initializer sampler if we're not directly loading from an xml
         if not self.deterministic_reset:
