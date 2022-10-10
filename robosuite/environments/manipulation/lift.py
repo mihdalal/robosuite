@@ -169,6 +169,7 @@ class Lift(SingleArmEnv):
         self.placement_initializer = placement_initializer
 
         self.use_distance_reduced_to_object_reward = use_distance_reduced_to_object_reward
+        self.use_min_prev_distance = use_min_prev_distance
 
         super().__init__(
             robots=robots,
