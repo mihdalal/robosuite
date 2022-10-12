@@ -152,6 +152,7 @@ class Lift(SingleArmEnv):
         camera_depths=False,
         use_distance_reduced_to_object_reward=False,
         use_min_prev_distance=False,
+        dist_reduced_reward_scale=1,
     ):
         # settings for table top
         self.table_full_size = table_full_size
@@ -170,6 +171,7 @@ class Lift(SingleArmEnv):
 
         self.use_distance_reduced_to_object_reward = use_distance_reduced_to_object_reward
         self.use_min_prev_distance = use_min_prev_distance
+        self.dist_reduced_reward_scale = dist_reduced_reward_scale
 
         super().__init__(
             robots=robots,
@@ -234,7 +236,7 @@ class Lift(SingleArmEnv):
             gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
             dist = np.linalg.norm(gripper_site_pos - cube_pos)
             if self.use_distance_reduced_to_object_reward:
-                reward += self.prev_d - dist
+                reward += (self.prev_d - dist) * self.dist_reduced_reward_scale
                 if self.use_min_prev_distance:
                     self.prev_d = min(self.prev_d, dist)
                 else:
@@ -245,7 +247,7 @@ class Lift(SingleArmEnv):
 
             # grasping reward
             if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
-                reward += 0.5
+                reward += 0.25
 
         # Scale reward if requested
         if self.reward_scale is not None:
@@ -379,9 +381,6 @@ class Lift(SingleArmEnv):
         Resets simulation internal configurations.
         """
         super()._reset_internal()
-        cube_pos = self.sim.data.body_xpos[self.cube_body_id]
-        gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
-        self.prev_d = np.linalg.norm(gripper_site_pos - cube_pos)
 
         # Reset all object positions using initializer sampler if we're not directly loading from an xml
         if not self.deterministic_reset:
@@ -392,6 +391,13 @@ class Lift(SingleArmEnv):
             # Loop through all objects and reset their positions
             for obj_pos, obj_quat, obj in object_placements.values():
                 self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([np.array(obj_pos), np.array(obj_quat)]))
+
+    def reset(self):
+        o = super().reset()
+        cube_pos = self.sim.data.body_xpos[self.cube_body_id]
+        gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
+        self.prev_d = np.linalg.norm(gripper_site_pos - cube_pos)
+        return o
 
     def visualize(self, vis_settings):
         """
