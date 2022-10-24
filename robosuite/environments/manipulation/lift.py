@@ -255,10 +255,10 @@ class Lift(SingleArmEnv):
                     if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
                         reward += 0.25
                         self.was_in_hand = True
-
-            # grasping reward
-            if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
-                reward += 0.25
+            else:
+                # grasping reward
+                if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
+                    reward += 0.25
 
         # Scale reward if requested
         if self.reward_scale is not None:
