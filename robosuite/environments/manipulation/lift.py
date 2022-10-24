@@ -153,6 +153,7 @@ class Lift(SingleArmEnv):
         use_distance_reduced_to_object_reward=False,
         use_min_prev_distance=False,
         dist_reduced_reward_scale=1,
+        first_grasp_reward=False,
     ):
         # settings for table top
         self.table_full_size = table_full_size
@@ -172,6 +173,7 @@ class Lift(SingleArmEnv):
         self.use_distance_reduced_to_object_reward = use_distance_reduced_to_object_reward
         self.use_min_prev_distance = use_min_prev_distance
         self.dist_reduced_reward_scale = dist_reduced_reward_scale
+        self.first_grasp_reward = first_grasp_reward
 
         super().__init__(
             robots=robots,
@@ -244,6 +246,15 @@ class Lift(SingleArmEnv):
             else:
                 reaching_reward = 1 - np.tanh(10.0 * dist)
                 reward += reaching_reward
+
+            if self.first_grasp_reward:
+                if self.was_in_hand:
+                    if not self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
+                        reward -= -.25
+                else:
+                    if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
+                        reward += 0.25
+                        self.was_in_hand = True
 
             # grasping reward
             if self._check_grasp(gripper=self.robots[0].gripper, object_geoms=self.cube):
@@ -397,6 +408,7 @@ class Lift(SingleArmEnv):
         cube_pos = self.sim.data.body_xpos[self.cube_body_id]
         gripper_site_pos = self.sim.data.site_xpos[self.robots[0].eef_site_id]
         self.prev_d = np.linalg.norm(gripper_site_pos - cube_pos)
+        self.was_in_hand = False
         return o
 
     def visualize(self, vis_settings):
