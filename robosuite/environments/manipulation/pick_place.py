@@ -193,12 +193,18 @@ class PickPlace(SingleArmEnv):
         camera_segmentations=None,  # {None, instance, class, element}
         renderer="mujoco",
         renderer_config=None,
+        valid_obj_names=None,
     ):
         # task settings
         self.single_object_mode = single_object_mode
         self.object_to_id = {"milk": 0, "bread": 1, "cereal": 2, "can": 3}
         self.object_id_to_sensors = {}  # Maps object id to sensor names for that object
         self.obj_names = ["Milk", "Bread", "Cereal", "Can"]
+        if valid_obj_names is None:
+            valid_obj_names = self.obj_names
+        self.valid_obj_names = valid_obj_names
+        for idx in range(len(self.valid_obj_names)):
+            self.object_to_id[self.valid_obj_names[idx].lower()] = idx
         if object_type is not None:
             assert object_type in self.object_to_id.keys(), "invalid @object_type argument - choose one of {}".format(
                 list(self.object_to_id.keys())
@@ -494,6 +500,8 @@ class PickPlace(SingleArmEnv):
             (MilkVisualObject, BreadVisualObject, CerealVisualObject, CanVisualObject),
             self.obj_names,
         ):
+            if obj_name not in self.valid_obj_names:
+                continue
             vis_name = "Visual" + obj_name
             vis_obj = vis_obj_cls(name=vis_name)
             self.visual_objects.append(vis_obj)
@@ -502,9 +510,10 @@ class PickPlace(SingleArmEnv):
             (MilkObject, BreadObject, CerealObject, CanObject),
             self.obj_names,
         ):
+            if obj_name not in self.valid_obj_names:
+                continue
             obj = obj_cls(name=obj_name)
             self.objects.append(obj)
-
         # task includes arena, robot, and objects of interest
         self.model = ManipulationTask(
             mujoco_arena=mujoco_arena,
