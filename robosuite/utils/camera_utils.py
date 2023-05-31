@@ -190,14 +190,13 @@ def transform_from_pixels_to_world(pixels, depth_map, camera_to_world_transform)
     # make sure leading dimensions are consistent
     pixels_leading_shape = pixels.shape[:-1]
     depth_map_leading_shape = depth_map.shape[:-3]
-    assert depth_map_leading_shape == pixels_leading_shape
+    # assert depth_map_leading_shape == pixels_leading_shape
 
     # sample from the depth map using the pixel locations with bilinear sampling
     pixels = pixels.astype(float)
     im_h, im_w = depth_map.shape[-2:]
-    depth_map_reshaped = depth_map.reshape(-1, im_h, im_w, 1)
-    z = bilinear_interpolate(im=depth_map_reshaped, x=pixels[..., 1:2], y=pixels[..., 0:1])
-    z = z.reshape(*depth_map_leading_shape, 1)  # shape [..., 1]
+    z = bilinear_interpolate(im=depth_map, x=pixels[..., 1:2], y=pixels[..., 0:1])
+    z = z.reshape(-1, 1)  # shape [..., 1]
 
     # form 4D homogenous camera vector to transform - [x * z, y * z, z, 1]
     # (note that we need to swap the first 2 dimensions of pixels to go from pixel indices
