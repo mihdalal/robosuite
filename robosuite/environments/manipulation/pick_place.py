@@ -435,43 +435,43 @@ class PickPlace(SingleArmEnv):
         )
 
         # each visual object should just be at the center of each target bin
-        index = 0
-        for vis_obj in self.visual_objects:
+        # index = 0
+        # for vis_obj in self.visual_objects:
 
-            # get center of target bin
-            bin_x_low = self.bin2_pos[0]
-            bin_y_low = self.bin2_pos[1]
-            if index == 0 or index == 2:
-                bin_x_low -= self.bin_size[0] / 2
-            if index < 2:
-                bin_y_low -= self.bin_size[1] / 2
-            bin_x_high = bin_x_low + self.bin_size[0] / 2
-            bin_y_high = bin_y_low + self.bin_size[1] / 2
-            bin_center = np.array(
-                [
-                    (bin_x_low + bin_x_high) / 2.0,
-                    (bin_y_low + bin_y_high) / 2.0,
-                ]
-            )
+        #     # get center of target bin
+        #     bin_x_low = self.bin2_pos[0]
+        #     bin_y_low = self.bin2_pos[1]
+        #     if index == 0 or index == 2:
+        #         bin_x_low -= self.bin_size[0] / 2
+        #     if index < 2:
+        #         bin_y_low -= self.bin_size[1] / 2
+        #     bin_x_high = bin_x_low + self.bin_size[0] / 2
+        #     bin_y_high = bin_y_low + self.bin_size[1] / 2
+        #     bin_center = np.array(
+        #         [
+        #             (bin_x_low + bin_x_high) / 2.0,
+        #             (bin_y_low + bin_y_high) / 2.0,
+        #         ]
+        #     )
 
-            # placement is relative to object bin, so compute difference and send to placement initializer
-            rel_center = bin_center - self.bin1_pos[:2]
+        #     # placement is relative to object bin, so compute difference and send to placement initializer
+        #     rel_center = bin_center - self.bin1_pos[:2]
 
-            self.placement_initializer.append_sampler(
-                sampler=UniformRandomSampler(
-                    name=f"{vis_obj.name}ObjectSampler",
-                    mujoco_objects=vis_obj,
-                    x_range=[rel_center[0], rel_center[0]],
-                    y_range=[rel_center[1], rel_center[1]],
-                    rotation=0.0,
-                    rotation_axis="z",
-                    ensure_object_boundary_in_range=False,
-                    ensure_valid_placement=False,
-                    reference_pos=self.bin1_pos,
-                    z_offset=self.bin2_pos[2] - self.bin1_pos[2],
-                )
-            )
-            index += 1
+        #     self.placement_initializer.append_sampler(
+        #         sampler=UniformRandomSampler(
+        #             name=f"{vis_obj.name}ObjectSampler",
+        #             mujoco_objects=vis_obj,
+        #             x_range=[rel_center[0], rel_center[0]],
+        #             y_range=[rel_center[1], rel_center[1]],
+        #             rotation=0.0,
+        #             rotation_axis="z",
+        #             ensure_object_boundary_in_range=False,
+        #             ensure_valid_placement=False,
+        #             reference_pos=self.bin1_pos,
+        #             z_offset=self.bin2_pos[2] - self.bin1_pos[2],
+        #         )
+        #     )
+            # index += 1
 
     def _load_model(self):
         """
