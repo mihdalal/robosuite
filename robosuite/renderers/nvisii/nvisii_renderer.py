@@ -188,7 +188,7 @@ class NVISIIRenderer(Renderer):
         Args:
             image (string): String for the file to use as an image for the walls
         """
-        texture_image = xml_path_completion("textures/" + image)
+        texture_image = "/home/mdalal/research/planseqlearn/robosuite/robosuite/models/assets/textures/plaster-wall-4k.jpg"
         texture = nvisii.texture.create_from_file(name="wall_texture", path=texture_image)
 
         for wall in self.env.model.mujoco_arena.worldbody.findall("./geom[@material='walls_mat']"):

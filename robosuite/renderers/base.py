@@ -19,7 +19,7 @@ def load_renderer_config(renderer):
         dict: renderer default config.
     """
     if renderer == "nvisii":
-        fname = "config/nvisii_config.json"
+        fname = "/home/mdalal/research/planseqlearn/robosuite/robosuite/renderers/config/nvisii_config.json"
     else:
         raise ValueError(f"renderer type can only be 'nvisii' got '{renderer}'")
 
